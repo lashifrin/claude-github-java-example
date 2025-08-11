@@ -55,25 +55,35 @@ jobs:
           Please provide constructive feedback in markdown format.
           `;
           
-          // Call Claude API (using curl since we're in a shell environment)
-          const curlCommand = `curl -X POST https://api.anthropic.com/v1/messages \\
-            -H "Content-Type: application/json" \\
-            -H "x-api-key: $ANTHROPIC_API_KEY" \\
-            -H "anthropic-version: 2023-06-01" \\
-            -d '{
-              "model": "claude-3-5-sonnet-20241022",
-              "max_tokens": 2000,
-              "messages": [
-                {
-                  "role": "user",
-                  "content": ${JSON.stringify(reviewPrompt)}
-                }
-              ]
-            }'`;
+          // Create temp file for the request payload to avoid shell quoting issues
+          const fs = require('fs');
+          const requestPayload = {
+            model: "claude-3-5-sonnet-20241022",
+            max_tokens: 2000,
+            messages: [
+              {
+                role: "user",
+                content: reviewPrompt
+              }
+            ]
+          };
+          
+          fs.writeFileSync('/tmp/claude_request.json', JSON.stringify(requestPayload));
           
           try {
-            const response = execSync(curlCommand, { encoding: 'utf8' });
+            const response = execSync(`curl -s -X POST https://api.anthropic.com/v1/messages \\
+              -H "Content-Type: application/json" \\
+              -H "x-api-key: $ANTHROPIC_API_KEY" \\
+              -H "anthropic-version: 2023-06-01" \\
+              -d @/tmp/claude_request.json`, { encoding: 'utf8' });
+            
+            console.log('Claude API Response:', response);
             const claudeResponse = JSON.parse(response);
+            
+            if (!claudeResponse.content || !claudeResponse.content[0]) {
+              throw new Error('Invalid response format: ' + JSON.stringify(claudeResponse));
+            }
+            
             const reviewContent = claudeResponse.content[0].text;
             
             // Post review as PR comment
