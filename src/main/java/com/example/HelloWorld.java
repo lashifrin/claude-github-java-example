@@ -9,6 +9,7 @@ public class HelloWorld {
         System.out.println("10 - 4 = " + calc.subtract(10, 4));
         System.out.println("5 * 6 = " + calc.multiply(5, 6));
         System.out.println("15 / 3 = " + calc.divide(15, 3));
+        System.out.println("2^3 = " + calc.power(2, 3));
     }
     
     public static class Calculator {
