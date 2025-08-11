@@ -86,7 +86,14 @@ jobs:
               }'`;
             
             const response = execSync(curlCommand, { encoding: 'utf8' });
+            console.log('Claude API Response:', response);
             const claudeResponse = JSON.parse(response);
+            console.log('Parsed response:', claudeResponse);
+            
+            if (!claudeResponse.content || !claudeResponse.content[0]) {
+              throw new Error('Invalid response format from Claude API');
+            }
+            
             const assistantContent = claudeResponse.content[0].text;
             
             await github.rest.issues.createComment({
@@ -143,7 +150,13 @@ jobs:
               }'`;
             
             const response = execSync(curlCommand, { encoding: 'utf8' });
+            console.log('Claude API Response:', response);
             const claudeResponse = JSON.parse(response);
+            
+            if (!claudeResponse.content || !claudeResponse.content[0]) {
+              throw new Error('Invalid response format from Claude API');
+            }
+            
             const assistantContent = claudeResponse.content[0].text;
             
             await github.rest.issues.createComment({
