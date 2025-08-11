@@ -1,0 +1,111 @@
+name: Claude Documentation Generation
+
+on:
+  push:
+    branches: [ master, main ]
+    paths:
+      - '**/*.java'
+      - 'pom.xml'
+  workflow_dispatch:
+
+jobs:
+  generate-docs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Set up JDK 8
+      uses: actions/setup-java@v4
+      with:
+        java-version: '8'
+        distribution: 'temurin'
+    
+    - name: Generate documentation with Claude
+      env:
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      run: |
+        # Read the main Java file
+        JAVA_CONTENT=$(cat src/main/java/com/example/HelloWorld.java)
+        POM_CONTENT=$(cat pom.xml)
+        
+        # Create documentation prompt
+        cat > doc_prompt.txt << 'EOF'
+        Please generate comprehensive documentation for this Java project including:
+        
+        1. A detailed README.md with:
+           - Project description
+           - Prerequisites
+           - Installation instructions
+           - Usage examples
+           - Build instructions
+           - Contributing guidelines
+        
+        2. Inline code documentation suggestions
+        
+        Here's the project structure:
+        
+        pom.xml:
+        ```xml
+        EOF
+        echo "$POM_CONTENT" >> doc_prompt.txt
+        cat >> doc_prompt.txt << 'EOF'
+        ```
+        
+        HelloWorld.java:
+        ```java
+        EOF
+        echo "$JAVA_CONTENT" >> doc_prompt.txt
+        cat >> doc_prompt.txt << 'EOF'
+        ```
+        
+        Please provide the README.md content in markdown format.
+        EOF
+        
+        # Call Claude API
+        RESPONSE=$(curl -s -X POST https://api.anthropic.com/v1/messages \
+          -H "Content-Type: application/json" \
+          -H "x-api-key: $ANTHROPIC_API_KEY" \
+          -H "anthropic-version: 2023-06-01" \
+          -d "{
+            \"model\": \"claude-3-sonnet-20240229\",
+            \"max_tokens\": 3000,
+            \"messages\": [
+              {
+                \"role\": \"user\",
+                \"content\": \"$(cat doc_prompt.txt | sed 's/\"/\\\"/g' | tr '\n' ' ')\"
+              }
+            ]
+          }")
+        
+        # Extract content from response and create README
+        echo "$RESPONSE" | jq -r '.content[0].text' > README.md
+        
+        # Clean up
+        rm doc_prompt.txt
+    
+    - name: Commit documentation
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "Claude Documentation Bot"
+        
+        if [ -n "$(git status --porcelain)" ]; then
+          git add README.md
+          git commit -m "📝 Update documentation with Claude AI
+
+          Auto-generated comprehensive documentation including:
+          - Project overview and description
+          - Installation and usage instructions  
+          - Build and development guidelines
+          
+          🤖 Generated with Claude AI"
+          git push
+        else
+          echo "No documentation changes to commit"
+        fi
